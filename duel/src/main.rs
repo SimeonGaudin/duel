@@ -106,15 +106,23 @@ fn main() {
         let score1 = player1.play_turn(&objectives);
         objectives = (0..num_objectives).map(|_| rng.random_range(0..=100)).collect();
         let score2 = player2.play_turn(&objectives);
-        
-        if score1 > score2 {
+
+        if score1 == score2 {
+            println!("ÉGALITÉ ! Personne ne perd de vitalité.");
+        } else if score1 > score2 {
             let diff = score1 - score2;
-            println!("{} gagne la manche! {} perd {} points de vitalité.", player1.name, player2.name, diff);
             player2.vitality -= diff
+            println!("{} gagne la manche ! {} perd {} points de vitalité.", player1.name, player2.name, diff);
+            println!("{} vous devez choisir quel poison appliquer à {} :", player1.name, player2.name);
+            println!("→ 1: -5 speed");
+            println!("→ 1: -5 strength");
         } else {
             let diff = score2 - score1;
-            println!("{} gagne la manche! {} perd {} points de vitalité.", player2.name, player1.name, diff);
             player1.vitality -= diff
+            println!("{} gagne la manche ! {} perd {} points de vitalité.", player2.name, player1.name, diff);
+            println!("{} vous devez choisir quel poison appliquer à {} :", player2.name, player1.name);
+            println!("→ 1: -5 speed");
+            println!("→ 1: -5 strength");
         }
         println!("## FIN Manche {} ##", manche);
         manche+=1;
