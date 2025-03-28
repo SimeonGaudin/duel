@@ -95,15 +95,16 @@ fn main() {
     let mut player2 = Player::new(&name2, vitality, 50, 50);
     
     let mut rng = rand::rng();
-    let objectives: Vec<i32> = (0..num_objectives).map(|_| rng.random_range(0..=100)).collect();
     
     let mut manche = 1;
 
     println!("##### Démarrage de la partie #####");
 
     while (player1.vitality > 0) && (player2.vitality > 0){
+        let mut objectives: Vec<i32> = (0..num_objectives).map(|_| rng.random_range(0..=100)).collect();
         println!("## Manche {} ##", manche);
         let score1 = player1.play_turn(&objectives);
+        objectives = (0..num_objectives).map(|_| rng.random_range(0..=100)).collect();
         let score2 = player2.play_turn(&objectives);
         
         if score1 > score2 {
