@@ -30,9 +30,9 @@ impl Player {
         let _ = io::stdin().read_line(&mut String::new());
         
         let mut total_score = 0;
-        let mut misses = 0;
         
         for &target in objectives.iter() {
+            let mut misses = 0;
             let counter = Arc::new(Mutex::new(0));
             let counter_clone = Arc::clone(&counter);
             let speed = self.speed;
@@ -44,7 +44,11 @@ impl Player {
                 while *running_clone.lock().unwrap() {
                     thread::sleep(time::Duration::from_millis(speed));
                     let mut counter = counter_clone.lock().unwrap();
-                    *counter = (*counter + 1) % 101;
+                    *counter = *counter + 1;
+                    if *counter > 100{
+                        *counter = 0;
+                        misses+=1;
+                    }
                     
                     execute!(
                         io::stdout(),
@@ -61,8 +65,7 @@ impl Player {
             handle.join().unwrap();
             
             let result = *counter.lock().unwrap();
-            let diff = ((target - result + 100) % 100).min((result - target + 100) % 100);
-            if result < target { misses += 1; }
+            let diff = (target - result).abs();
             let score = match diff {
                 0 => (100 + self.strength) / (misses + 1),
                 1..=5 => (80 + self.strength) / (misses + 1),
