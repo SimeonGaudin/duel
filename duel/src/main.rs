@@ -97,17 +97,28 @@ fn main() {
     let mut rng = rand::rng();
     let objectives: Vec<i32> = (0..num_objectives).map(|_| rng.random_range(0..=100)).collect();
     
+    let mut manche = 1;
+
     println!("##### Démarrage de la partie #####");
-    let score1 = player1.play_turn(&objectives);
-    let score2 = player2.play_turn(&objectives);
-    
-    if score1 > score2 {
-        println!("{} gagne la manche!", player1.name);
-        player2.vitality -= score1 - score2;
-    } else {
-        println!("{} gagne la manche!", player2.name);
-        player1.vitality -= score2 - score1;
+
+    while (player1.vitality > 0) && (player2.vitality > 0){
+        println!("## Manche {} ##", manche);
+        let score1 = player1.play_turn(&objectives);
+        let score2 = player2.play_turn(&objectives);
+        
+        if score1 > score2 {
+            let diff = score1 - score2;
+            println!("{} gagne la manche! {} perd {} points de vitalité.", player1.name, player2.name, diff);
+            player2.vitality -= diff
+        } else {
+            let diff = score2 - score1;
+            println!("{} gagne la manche! {} perd {} points de vitalité.", player2.name, player1.name, diff);
+            player1.vitality -= diff
+        }
+        println!("## FIN Manche {} ##", manche);
+        manche+=1;
     }
+    
     
     println!("Fin de la partie: {} {} PV, {} {} PV", player1.name, player1.vitality, player2.name, player2.vitality);
 }
