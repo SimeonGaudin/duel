@@ -2,6 +2,7 @@ use rand::Rng;
 use std::{io, thread, time, env};
 use std::sync::{Arc, Mutex};
 use crossterm::{execute, terminal::{Clear, ClearType}, cursor};
+use std::io::Write;
 
 struct Player {
     name: String,
@@ -90,8 +91,8 @@ fn main() {
     let mut player1 = Player::new(&name1, vitality, 50, 50);
     let mut player2 = Player::new(&name2, vitality, 50, 50);
     
-    let mut rng = rand::thread_rng();
-    let objectives: Vec<i32> = (0..num_objectives).map(|_| rng.gen_range(0..=100)).collect();
+    let mut rng = rand::rng();
+    let objectives: Vec<i32> = (0..num_objectives).map(|_| rng.random_range(0..=100)).collect();
     
     println!("##### Démarrage de la partie #####");
     let score1 = player1.play_turn(&objectives);
