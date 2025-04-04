@@ -6,14 +6,14 @@ use std::io::Write;
 
 struct Player {
     name: String,
-    vitality: i32,
+    vitality: u32,
     speed: u64,
-    strength: i32,
-    score: i32,
+    strength: u32,
+    score: u32,
 }
 
 impl Player {
-    fn new(name: &str, vitality: i32, speed: u64, strength: i32) -> Self {
+    fn new(name: &str, vitality: u32, speed: u64, strength: u32) -> Self {
         Self {
             name: name.to_string(),
             vitality,
@@ -23,7 +23,7 @@ impl Player {
         }
     }
 
-    fn play_turn(&mut self, objectives: &Vec<i32>) -> i32 {
+    fn play_turn(&mut self, objectives: &Vec<i32>) -> u32 {
         println!("Au tour de {} (Vitalité={}, Vitesse={}, Force={})", self.name, self.vitality, self.speed, self.strength);
         println!("→ Objectifs : {:?}", objectives);
         println!("Appuyer sur ENTREE pour démarrer le tour..");
@@ -32,7 +32,8 @@ impl Player {
         let mut total_score = 0;
         
         for &target in objectives.iter() {
-            let mut misses = 0;
+            let misses = Arc::new(Mutex::new(0));
+            let misses_clone = Arc::clone(&misses);
             let counter = Arc::new(Mutex::new(0));
             let counter_clone = Arc::clone(&counter);
             let speed = self.speed;
@@ -47,7 +48,7 @@ impl Player {
                     *counter = *counter + 1;
                     if *counter > 100{
                         *counter = 0;
-                        misses+=1;
+                        *misses_clone.lock().unwrap() += 1;
                     }
                     
                     execute!(
@@ -64,31 +65,51 @@ impl Player {
             *running.lock().unwrap() = false;
             handle.join().unwrap();
             
+            let miss_count = *misses.lock().unwrap();
             let result = *counter.lock().unwrap();
             let diff = (target - result).abs();
             let score = match diff {
-                0 => (100 + self.strength) / (misses + 1),
-                1..=5 => (80 + self.strength) / (misses + 1),
-                6..=10 => (60 + self.strength) / (misses + 1),
-                11..=20 => (40 + self.strength) / (misses + 1),
-                21..=50 => (20 + self.strength) / (misses + 1),
-                _ => (0 + self.strength) / (misses + 1),
+                0 => (100 + self.strength) / (miss_count + 1),
+                1..=5 => (80 + self.strength) / (miss_count + 1),
+                6..=10 => (60 + self.strength) / (miss_count + 1),
+                11..=20 => (40 + self.strength) / (miss_count + 1),
+                21..=50 => (20 + self.strength) / (miss_count + 1),
+                _ => (0 + self.strength) / (miss_count + 1),
             };
-            println!("\n→ Objectif {} : Miss = {} | Compteur = {} // Score = {}", target, misses, result, score);
+            println!("\n→ Objectif {} : Miss = {} | Compteur = {} // Score = {}", target, miss_count, result, score);
             total_score += score;
         }
         
-        self.score = (total_score as f64 / objectives.len() as f64).ceil() as i32;
-        println!("# Fin du tour #\n→ Score moyen {}", self.score);
+        self.score = (total_score as f64 / objectives.len() as f64).ceil() as u32;
+        println!("# Fin du tour #\n→ Score moyen {}\n\n", self.score);
         self.score
     }
 }
 
+fn apply_poison(player: &mut Player) {
+    let mut choice = String::new();
+    loop {
+        io::stdin().read_line(&mut choice).unwrap();
+        match choice.trim() {
+            "1" => {
+                player.speed = player.speed.saturating_sub(5);
+                println!("Vitesse de {} réduite à {}", player.name, player.speed);
+                break;
+            },
+            "2" => {
+                player.strength -= 5;
+                println!("Force de {} réduite à {}", player.name, player.strength);
+                break;
+            },
+            _ => println!("Choix invalide. Veuillez entrer 1 ou 2."),
+        }
+    }
+}
 fn main() {
     let args: Vec<String> = env::args().collect();
-    let name1 = args.iter().position(|r| r == "--name1").map(|i| args[i + 1].clone()).unwrap_or("Michel".to_string());
-    let name2 = args.iter().position(|r| r == "--name2").map(|i| args[i + 1].clone()).unwrap_or("Jacque".to_string());
-    let vitality: i32 = args.iter().position(|r| r == "--vitality").map(|i| args[i + 1].parse().unwrap_or(50)).unwrap_or(50);
+    let name1 = args.iter().position(|r| r == "--name1").map(|i| args[i + 1].clone()).unwrap_or("Joueur 1".to_string());
+    let name2 = args.iter().position(|r| r == "--name2").map(|i| args[i + 1].clone()).unwrap_or("Joueur 2".to_string());
+    let vitality: u32 = args.iter().position(|r| r == "--vitality").map(|i| args[i + 1].parse().unwrap_or(50)).unwrap_or(50);
     let num_objectives: usize = args.iter().position(|r| r == "--objectifs").map(|i| args[i + 1].parse().unwrap_or(5)).unwrap_or(5);
     
     let mut player1 = Player::new(&name1, vitality, 50, 50);
@@ -111,18 +132,20 @@ fn main() {
             println!("ÉGALITÉ ! Personne ne perd de vitalité.");
         } else if score1 > score2 {
             let diff = score1 - score2;
-            player2.vitality -= diff
+            player2.vitality = player2.vitality.saturating_sub(diff);
             println!("{} gagne la manche ! {} perd {} points de vitalité.", player1.name, player2.name, diff);
             println!("{} vous devez choisir quel poison appliquer à {} :", player1.name, player2.name);
-            println!("→ 1: -5 speed");
-            println!("→ 1: -5 strength");
+            println!("→ 1: -5 vitesse");
+            println!("→ 2: -5 force");
+            apply_poison(&mut player2);
         } else {
             let diff = score2 - score1;
-            player1.vitality -= diff
+            player1.vitality = player1.vitality.saturating_sub(diff);
             println!("{} gagne la manche ! {} perd {} points de vitalité.", player2.name, player1.name, diff);
             println!("{} vous devez choisir quel poison appliquer à {} :", player2.name, player1.name);
-            println!("→ 1: -5 speed");
-            println!("→ 1: -5 strength");
+            println!("→ 1: -5 vitesse");
+            println!("→ 2: -5 force");
+            apply_poison(&mut player1);
         }
         println!("## FIN Manche {} ##", manche);
         manche+=1;
