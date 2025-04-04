@@ -34,7 +34,7 @@ impl Player {
         for &target in objectives.iter() {
             let misses = Arc::new(Mutex::new(0));
             let misses_clone = Arc::clone(&misses);
-            let counter = Arc::new(Mutex::new(0));
+            let counter = Arc::new(Mutex::new(-1)); // Initialiser le compteur à -1 pour rendre le 0 possible selon la logique qui suit
             let counter_clone = Arc::clone(&counter);
             let speed = self.speed;
             
@@ -43,7 +43,6 @@ impl Player {
             
             let handle = thread::spawn(move || {
                 while *running_clone.lock().unwrap() {
-                    thread::sleep(time::Duration::from_millis(speed));
                     let mut counter = counter_clone.lock().unwrap();
                     *counter = *counter + 1;
                     if *counter > 100{
@@ -56,17 +55,24 @@ impl Player {
                         Clear(ClearType::CurrentLine),
                         cursor::MoveToColumn(0)
                     ).unwrap();
-                    print!("Compteur: {}", *counter);
+                    print!("\r→ Objectif {} : Miss = {} | Compteur = {}", target, *misses_clone.lock().unwrap(), *counter);
                     io::stdout().flush().unwrap();
+                    thread::sleep(time::Duration::from_millis(speed));
                 }
             });
             
             let _ = io::stdin().read_line(&mut String::new());
             *running.lock().unwrap() = false;
             handle.join().unwrap();
-            
+
+            // Ajuster et afficher le compteur pour qu'il ne soit pas négatif si le joueur est trop rapide pour le thread
+            let mut result = *counter.lock().unwrap();
+            if result < 0 {
+                result = 0;
+                println!("\r→ Objectif {} : Miss = 0 | Compteur = 0", target);
+            }
+
             let miss_count = *misses.lock().unwrap();
-            let result = *counter.lock().unwrap();
             let diff = (target - result).abs();
             let score = match diff {
                 0 => (100 + self.strength) / (miss_count + 1),
@@ -76,12 +82,11 @@ impl Player {
                 21..=50 => (20 + self.strength) / (miss_count + 1),
                 _ => (0 + self.strength) / (miss_count + 1),
             };
-            println!("\n→ Objectif {} : Miss = {} | Compteur = {} // Score = {}", target, miss_count, result, score);
             total_score += score;
         }
         
-        self.score = (total_score as f64 / objectives.len() as f64).ceil() as u32;
-        println!("# Fin du tour #\n→ Score moyen {}\n\n", self.score);
+        self.score = (total_score as f64 / objectives.len() as f64).ceil() as u32; // scrore moyen arrondi à l'entier supérieur
+        println!("\n# Fin du tour #\n→ Score moyen {}\n\n", self.score);
         self.score
     }
 }
@@ -97,7 +102,7 @@ fn apply_poison(player: &mut Player) {
                 break;
             },
             "2" => {
-                player.strength -= 5;
+                player.strength = player.strength.saturating_sub(5);
                 println!("Force de {} réduite à {}", player.name, player.strength);
                 break;
             },
@@ -111,9 +116,11 @@ fn main() {
     let name2 = args.iter().position(|r| r == "--name2").map(|i| args[i + 1].clone()).unwrap_or("Joueur 2".to_string());
     let vitality: u32 = args.iter().position(|r| r == "--vitality").map(|i| args[i + 1].parse().unwrap_or(50)).unwrap_or(50);
     let num_objectives: usize = args.iter().position(|r| r == "--objectifs").map(|i| args[i + 1].parse().unwrap_or(5)).unwrap_or(5);
-    
-    let mut player1 = Player::new(&name1, vitality, 50, 50);
-    let mut player2 = Player::new(&name2, vitality, 50, 50);
+    let speed: u64 = args.iter().position(|r| r == "--speed").map(|i| args[i + 1].parse().unwrap_or(50)).unwrap_or(50);
+    let strength: u32 = args.iter().position(|r| r == "--strength").map(|i| args[i + 1].parse().unwrap_or(50)).unwrap_or(50);
+
+    let mut player1 = Player::new(&name1, vitality, speed, strength);
+    let mut player2 = Player::new(&name2, vitality, speed, strength);
     
     let mut rng = rand::rng();
     
